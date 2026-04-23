@@ -9,9 +9,5 @@
     <RootNamespace>Aes67Vcs.Core</RootNamespace>
   </PropertyGroup>
 
-  <ItemGroup>
-    <!-- WASAPI 캡처 / 디바이스 열거 -->
-    <PackageReference Include="NAudio.Wasapi" Version="2.2.1" />
-  </ItemGroup>
 
 </Project>

@@ -52,6 +52,9 @@ Source: "..\build\output\Aes67Vcs.Core.dll";         DestDir: "{app}"; Flags: ig
 Source: "..\build\output\Aes67Vcs.deps.json";        DestDir: "{app}"; Flags: ignoreversion
 Source: "..\build\output\Aes67Vcs.runtimeconfig.json"; DestDir: "{app}"; Flags: ignoreversion
 
+; ── C++ 오디오 엔진 DLL ────────────────────────────────────
+Source: "..\build\native\Aes67Engine.dll";           DestDir: "{app}"; Flags: ignoreversion
+
 ; ── Scream 드라이버 (x64) ──────────────────────────────────
 Source: "..\tools\scream\Install\driver\x64\Scream.sys"; DestDir: "{app}\driver\x64"; Flags: ignoreversion
 Source: "..\tools\scream\Install\driver\x64\Scream.inf"; DestDir: "{app}\driver\x64"; Flags: ignoreversion

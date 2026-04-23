@@ -12,12 +12,19 @@ namespace Aes67Vcs.UI.Forms;
 public class MainForm : Form
 {
     // ── 서비스 ───────────────────────────────────────────────
-    private Aes67Config    _cfg;
-    private PtpClient?     _ptp;
-    private SapAnnouncer?  _sap;
-    private Aes67Streamer? _streamer;
-    private ScreamManager  _scream;
-    private bool           _running;
+    private Aes67Config   _cfg;
+    private PtpMonitor?   _ptp;
+    private SapAnnouncer? _sap;
+    private ScreamManager _scream;
+    private bool          _running;
+
+    // C++ 통계 콜백 — GC 방지를 위해 필드로 유지
+    private Aes67StatsCallback? _statsCallback;
+
+    // 최근 통계
+    private volatile int   _lastPkts;
+    private volatile float _lastJitter;
+    private volatile int   _lastChannels;
 
     // ── 컨트롤 ───────────────────────────────────────────────
     private GroupBox _grpStream = null!;
@@ -45,9 +52,9 @@ public class MainForm : Form
     private Button _btnApply        = null!;
 
     // RTP 스트리머 상태
-    private Label _lblRtpDevice  = null!;
-    private Label _lblRtpPkts    = null!;
-    private Label _lblRtpJitter  = null!;
+    private Label _lblRtpDevice = null!;
+    private Label _lblRtpPkts   = null!;
+    private Label _lblRtpJitter = null!;
 
     // 시작/중지
     private Button  _btnStart = null!;
@@ -55,9 +62,8 @@ public class MainForm : Form
     private ListBox _lstLog   = null!;
 
     // UI 타이머
-    private System.Windows.Forms.Timer _uiTimer    = null!;
-    private PtpStatus    _lastPtpStatus   = new();
-    private StreamerStats _lastStreamerStats = new();
+    private System.Windows.Forms.Timer _uiTimer = null!;
+    private PtpStatus _lastPtpStatus = new();
 
     public MainForm()
     {
@@ -66,7 +72,7 @@ public class MainForm : Form
         InitializeComponent();
         LoadConfigToUi();
         CheckScreamStatus();
-        RefreshDeviceList();
+        RefreshDeviceLabel();
     }
 
     // ── UI 구성 ──────────────────────────────────────────────
@@ -80,12 +86,12 @@ public class MainForm : Form
         StartPosition   = FormStartPosition.CenterScreen;
         Font            = new Font("Segoe UI", 9f);
 
-        BuildStreamGroup();   // y=10,  h=160
-        BuildPtpGroup();      // y=180, h=140
-        BuildScreamGroup();   // y=330, h=80
-        BuildRtpGroup();      // y=420, h=90
-        BuildButtonBar();     // y=520
-        BuildLogBox();        // y=570
+        BuildStreamGroup();
+        BuildPtpGroup();
+        BuildScreamGroup();
+        BuildRtpGroup();
+        BuildButtonBar();
+        BuildLogBox();
 
         _uiTimer = new System.Windows.Forms.Timer { Interval = 1000 };
         _uiTimer.Tick += (_, _) => { UpdatePtpUi(); UpdateRtpUi(); };
@@ -141,14 +147,14 @@ public class MainForm : Form
     {
         _grpPtp = new GroupBox
         {
-            Text = "PTP 동기화 (IEEE 1588v2)",
+            Text = "PTP 동기화 (IEEE 1588v2 / W32TM)",
             Location = new Point(10, 180), Size = new Size(580, 140)
         };
         int y = 22;
 
         _chkPtp = new CheckBox
         {
-            Text = "PTP 동기화 활성화", Location = new Point(10, y), Size = new Size(180, 24)
+            Text = "W32TM PTP 모니터링", Location = new Point(10, y), Size = new Size(190, 24)
         };
         _grpPtp.Controls.Add(_chkPtp);
 
@@ -217,7 +223,7 @@ public class MainForm : Form
     {
         _grpRtp = new GroupBox
         {
-            Text = "AES67 RTP 스트리머",
+            Text = "AES67 RTP 엔진 (C++)",
             Location = new Point(10, 420), Size = new Size(580, 90)
         };
 
@@ -238,7 +244,7 @@ public class MainForm : Form
         _lblRtpJitter = new Label
         {
             Location = new Point(290, 44), Size = new Size(270, 20),
-            Text = "ptime: -", ForeColor = Color.DimGray
+            Text = "지터: -", ForeColor = Color.DimGray
         };
         _grpRtp.Controls.Add(_lblRtpJitter);
 
@@ -327,38 +333,50 @@ public class MainForm : Form
             return;
         }
 
-        // 1. PTP
-        if (_cfg.PtpEnabled)
+        // 1. C++ 엔진 초기화
+        string srcIp = _cfg.LocalInterface ?? "";
+        if (!Aes67EngineInterop.Aes67Engine_Init(
+                _cfg.MulticastAddress, _cfg.RtpPort,
+                (int)_cfg.Channels, srcIp))
         {
-            _ptp = new PtpClient(_cfg);
-            _ptp.StatusChanged += OnPtpStatus;
-            _ptp.Start();
-            Log("PTP 클라이언트 시작");
+            Log("[오류] 엔진 초기화 실패");
+            return;
         }
 
-        // 2. SAP
+        // 2. 통계 콜백 등록 (필드로 보관 → GC 방지)
+        _statsCallback = (pkts, jitter, dropped, ch) =>
+        {
+            _lastPkts     = pkts;
+            _lastJitter   = jitter;
+            _lastChannels = ch;
+        };
+        Aes67EngineInterop.Aes67Engine_SetStatsCallback(_statsCallback);
+
+        // 3. 엔진 시작
+        if (!Aes67EngineInterop.Aes67Engine_Start())
+        {
+            Log("[오류] 엔진 시작 실패 — Scream 디바이스를 찾을 수 없거나 소켓 오류");
+            return;
+        }
+        Log($"AES67 엔진 시작 (C++) — {(int)_cfg.Channels}ch / L24 / 48kHz / 4ms ptime");
+        _lblRtpDevice.Text      = "소스 디바이스: Scream (WDM) ← WASAPI Loopback";
+        _lblRtpDevice.ForeColor = Color.DarkGreen;
+
+        // 4. PTP 모니터 (W32TM)
+        if (_cfg.PtpEnabled)
+        {
+            _ptp = new PtpMonitor();
+            _ptp.StatusChanged += OnPtpStatus;
+            _ptp.Start();
+            Log("PTP 모니터 시작 (W32TM)");
+        }
+
+        // 5. SAP
         _sap = new SapAnnouncer(_cfg);
         _sap.Start();
         Log($"SAP 어나운서 시작 → {_cfg.MulticastAddress}:{_cfg.RtpPort}");
 
-        // 3. AES67 RTP 스트리머
-        try
-        {
-            _streamer = new Aes67Streamer(_cfg);
-            _streamer.StatsUpdated += OnStreamerStats;
-            _streamer.Start();
-            Log("AES67 RTP 스트리머 시작 (WASAPI Loopback → L24 RTP)");
-            _lblRtpDevice.Text = "소스 디바이스: Scream (WDM) ← WASAPI Loopback";
-            _lblRtpDevice.ForeColor = Color.DarkGreen;
-        }
-        catch (Exception ex)
-        {
-            Log($"[경고] RTP 스트리머: {ex.Message}");
-            _lblRtpDevice.Text      = $"소스 디바이스: 오류 — {ex.Message}";
-            _lblRtpDevice.ForeColor = Color.OrangeRed;
-        }
-
-        // 4. Scream 설정
+        // 6. Scream 레지스트리 설정
         try   { _scream.ApplyConfig(); Log("Scream 레지스트리 설정 적용"); }
         catch (Exception ex) { Log($"[경고] Scream: {ex.Message}"); }
 
@@ -366,28 +384,31 @@ public class MainForm : Form
         _btnStart.Enabled = false;
         _btnStop.Enabled  = true;
         SetGroupsEnabled(false);
-        Log($"시작 — {(int)_cfg.Channels}ch / L24 / 48kHz / 4ms ptime");
     }
 
     private void OnStop(object? sender, EventArgs e)
     {
-        _streamer?.Stop(); _streamer?.Dispose(); _streamer = null;
-        _ptp?.Stop();      _ptp?.Dispose();      _ptp      = null;
-        _sap?.Stop();      _sap?.Dispose();      _sap      = null;
+        // C++ 엔진 중지
+        Aes67EngineInterop.Aes67Engine_SetStatsCallback(null);
+        Aes67EngineInterop.Aes67Engine_Stop();
+        _statsCallback = null;
+
+        _ptp?.Stop(); _ptp?.Dispose(); _ptp = null;
+        _sap?.Stop(); _sap?.Dispose(); _sap = null;
 
         _running = false;
         _btnStart.Enabled = true;
         _btnStop.Enabled  = false;
         SetGroupsEnabled(true);
 
-        _lblPtpState.Text      = "상태: 비활성";
-        _lblPtpState.ForeColor = Color.Gray;
-        _lblPtpOffset.Text     = "오프셋: -";
-        _lblPtpMaster.Text     = "마스터: -";
-        _lblRtpDevice.Text     = "소스 디바이스: -";
+        _lblPtpState.Text       = "상태: 비활성";
+        _lblPtpState.ForeColor  = Color.Gray;
+        _lblPtpOffset.Text      = "오프셋: -";
+        _lblPtpMaster.Text      = "마스터: -";
+        _lblRtpDevice.Text      = "소스 디바이스: -";
         _lblRtpDevice.ForeColor = Color.DimGray;
-        _lblRtpPkts.Text       = "패킷: -";
-        _lblRtpJitter.Text     = "ptime: -";
+        _lblRtpPkts.Text        = "패킷: -";
+        _lblRtpJitter.Text      = "지터: -";
 
         Log("중지됨");
     }
@@ -411,7 +432,7 @@ public class MainForm : Form
             await _scream.InstallDriverAsync(infPath);
             Log("드라이버 설치 완료");
             CheckScreamStatus();
-            RefreshDeviceList();
+            RefreshDeviceLabel();
         }
         catch (Exception ex)
         {
@@ -436,13 +457,15 @@ public class MainForm : Form
 
     // ── 상태 업데이트 ────────────────────────────────────────
 
-    private void OnPtpStatus(object? sender, PtpStatus s) => _lastPtpStatus = s;
-
-    private void OnStreamerStats(object? sender, StreamerStats s)
+    private void OnPtpStatus(PtpStatus s)
     {
-        _lastStreamerStats = s;
-        if (_streamer != null)
-            _streamer.SetPtpOffset(_lastPtpStatus.OffsetNs);
+        _lastPtpStatus = s;
+        // PTP 오프셋을 C++ 엔진에 전달
+        if (s.State == PtpState.Locked || s.State == PtpState.Syncing)
+        {
+            try { Aes67EngineInterop.Aes67Engine_SetPtpOffsetNs(s.OffsetNs); }
+            catch { /* DLL 미로드 시 무시 */ }
+        }
     }
 
     private void UpdatePtpUi()
@@ -458,18 +481,25 @@ public class MainForm : Form
             _                => Color.Gray
         };
         _lblPtpOffset.Text = s.IsLocked
-            ? $"오프셋: {s.OffsetNs:+#;-#;0} ns  /  지연: {s.MeanPathDelayNs} ns"
+            ? $"오프셋: {s.OffsetNs:+#;-#;0} ns"
             : "오프셋: -";
         _lblPtpMaster.Text = string.IsNullOrEmpty(s.MasterClockId)
-            ? "마스터: 탐색 중..." : $"마스터: {FormatClockId(s.MasterClockId)}";
+            ? "마스터: 탐색 중..." : $"마스터: {s.MasterClockId}";
     }
 
     private void UpdateRtpUi()
     {
-        if (!_running || _streamer == null) return;
-        var s = _lastStreamerStats;
-        _lblRtpPkts.Text  = $"패킷: {s.PacketsPerSec} pkt/s  ({s.Channels}ch)";
-        _lblRtpJitter.Text = $"ptime: {s.PtimeMs}ms → {s.Destination}";
+        if (!_running) return;
+        int   pkts    = _lastPkts;
+        float jitter  = _lastJitter;
+        int   ch      = _lastChannels;
+
+        _lblRtpPkts.Text   = pkts > 0
+            ? $"패킷: {pkts} pkt/s  ({ch}ch)"
+            : "패킷: 대기 중...";
+        _lblRtpJitter.Text = pkts > 0
+            ? $"지터: {jitter:F1} μs"
+            : "지터: -";
     }
 
     // ── 유틸리티 ─────────────────────────────────────────────
@@ -482,15 +512,22 @@ public class MainForm : Form
         _btnApply.Enabled          = ok;
     }
 
-    private void RefreshDeviceList()
+    private void RefreshDeviceLabel()
     {
         try
         {
-            var devices = Aes67Streamer.GetRenderDeviceNames();
-            _lblRtpDevice.Text = devices.Any(d =>
-                d.Contains("Scream", StringComparison.OrdinalIgnoreCase))
+            string[] devices = Aes67EngineInterop.GetDeviceNames();
+            bool hasScream = devices.Any(d =>
+                d.Contains("Scream", StringComparison.OrdinalIgnoreCase));
+            _lblRtpDevice.Text      = hasScream
                 ? "소스 디바이스: Scream 감지됨 ✓"
                 : "소스 디바이스: Scream 없음 (드라이버 설치 필요)";
+            _lblRtpDevice.ForeColor = hasScream ? Color.DarkGreen : Color.OrangeRed;
+        }
+        catch (DllNotFoundException)
+        {
+            _lblRtpDevice.Text      = "소스 디바이스: Aes67Engine.dll 없음";
+            _lblRtpDevice.ForeColor = Color.Red;
         }
         catch { }
     }
@@ -542,12 +579,6 @@ public class MainForm : Form
         _lstLog.TopIndex = _lstLog.Items.Count - 1;
     }
 
-    private static string FormatClockId(string id) =>
-        id.Length >= 16
-            ? $"{id[..2]}-{id[2..4]}-{id[4..6]}-{id[6..8]}-" +
-              $"{id[8..10]}-{id[10..12]}-{id[12..14]}-{id[14..16]}"
-            : id;
-
     private static Label AddLabel(Control parent, string text,
         int x, int y, int width = 90)
     {
@@ -569,6 +600,7 @@ public class MainForm : Form
     protected override void OnFormClosing(FormClosingEventArgs e)
     {
         if (_running) OnStop(null, EventArgs.Empty);
+        _uiTimer.Stop();
         base.OnFormClosing(e);
     }
 }
