@@ -1,6 +1,7 @@
 // ============================================================
 // WasapiCapture.cpp
 // ============================================================
+// winsock2.h must come before windows.h — WasapiCapture.h handles this
 #include "WasapiCapture.h"
 #include <avrt.h>
 #include <functiondiscoverykeys_devpkey.h>

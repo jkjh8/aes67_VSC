@@ -1,12 +1,22 @@
 // ============================================================
 // Engine.cpp — DLL 진입점 + 공개 C API 구현
 // ============================================================
-#define AES67ENGINE_EXPORTS
+// winsock2.h 는 반드시 windows.h 보다 먼저 포함되어야 함
+#ifndef WIN32_LEAN_AND_MEAN
+#define WIN32_LEAN_AND_MEAN
+#endif
+#ifndef NOMINMAX
+#define NOMINMAX
+#endif
+#include <winsock2.h>
+#include <ws2tcpip.h>
+
 #include "Aes67Engine.h"
 #include "WasapiCapture.h"
 #include "RtpSender.h"
 
 #include <windows.h>
+#include <avrt.h>       // AvSetMmThreadCharacteristics
 #include <mmsystem.h>
 #include <atomic>
 #include <mutex>

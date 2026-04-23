@@ -3,6 +3,9 @@
 // Aes67Engine.h  — AES67 RTP 스트리머 C++ DLL 공개 API
 // C# P/Invoke 호환: __stdcall, blittable 타입만 사용
 // ============================================================
+#ifndef WIN32_LEAN_AND_MEAN
+#define WIN32_LEAN_AND_MEAN
+#endif
 #include <stdint.h>
 #include <stdbool.h>
 

@@ -42,14 +42,14 @@
 
   <!-- ── Debug 경로 ─────────────────────────────────────────── -->
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
-    <OutDir>$(SolutionDir)build\native\</OutDir>
+    <OutDir>$(MSBuildProjectDirectory)\..\..\build\native\</OutDir>
     <IntDir>$(ProjectDir)obj\$(Configuration)\</IntDir>
     <TargetName>Aes67Engine</TargetName>
   </PropertyGroup>
 
   <!-- ── Release 경로 ──────────────────────────────────────── -->
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
-    <OutDir>$(SolutionDir)build\native\</OutDir>
+    <OutDir>$(MSBuildProjectDirectory)\..\..\build\native\</OutDir>
     <IntDir>$(ProjectDir)obj\$(Configuration)\</IntDir>
     <TargetName>Aes67Engine</TargetName>
   </PropertyGroup>

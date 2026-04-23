@@ -4,6 +4,13 @@
 // Scream 가상 디바이스에서 오디오 스트림을 읽어
 // 콜백으로 float32 PCM을 전달
 // ============================================================
+#ifndef WIN32_LEAN_AND_MEAN
+#define WIN32_LEAN_AND_MEAN
+#endif
+#ifndef NOMINMAX
+#define NOMINMAX
+#endif
+#include <winsock2.h>   // winsock.h 보다 먼저 포함 필수
 #include <windows.h>
 #include <mmdeviceapi.h>
 #include <audioclient.h>

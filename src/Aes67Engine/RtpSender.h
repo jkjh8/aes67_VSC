@@ -2,6 +2,12 @@
 // ============================================================
 // RtpSender.h — AES67 RTP 패킷 조립 + UDP 멀티캐스트 송신
 // ============================================================
+#ifndef WIN32_LEAN_AND_MEAN
+#define WIN32_LEAN_AND_MEAN
+#endif
+#ifndef NOMINMAX
+#define NOMINMAX
+#endif
 #include <winsock2.h>
 #include <ws2tcpip.h>
 #include <stdint.h>
