@@ -7,6 +7,8 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Aes67Vcs.Core", "src\Aes67V
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Aes67Vcs.UI", "src\Aes67Vcs.UI\Aes67Vcs.UI.csproj", "{B2C3D4E5-F6A7-8901-BCDE-F12345678901}"
 EndProject
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "Aes67Engine", "src\Aes67Engine\Aes67Engine.vcxproj", "{C1D2E3F4-A5B6-7890-CDEF-012345678901}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|x64 = Debug|x64
@@ -21,5 +23,9 @@ Global
 		{B2C3D4E5-F6A7-8901-BCDE-F12345678901}.Debug|x64.Build.0 = Debug|x64
 		{B2C3D4E5-F6A7-8901-BCDE-F12345678901}.Release|x64.ActiveCfg = Release|x64
 		{B2C3D4E5-F6A7-8901-BCDE-F12345678901}.Release|x64.Build.0 = Release|x64
+		{C1D2E3F4-A5B6-7890-CDEF-012345678901}.Debug|x64.ActiveCfg = Release|x64
+		{C1D2E3F4-A5B6-7890-CDEF-012345678901}.Debug|x64.Build.0 = Release|x64
+		{C1D2E3F4-A5B6-7890-CDEF-012345678901}.Release|x64.ActiveCfg = Release|x64
+		{C1D2E3F4-A5B6-7890-CDEF-012345678901}.Release|x64.Build.0 = Release|x64
 	EndGlobalSection
 EndGlobal
