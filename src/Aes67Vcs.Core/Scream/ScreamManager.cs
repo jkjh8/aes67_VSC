@@ -6,21 +6,26 @@ using Aes67Vcs.Core.Models;
 namespace Aes67Vcs.Core.Scream;
 
 /// <summary>
-/// Scream 드라이버 레지스트리 설정 및 서비스 제어.
+/// Scream 4.0 드라이버 레지스트리 설정 및 서비스 제어.
 ///
-/// Scream 레지스트리 키:
-///   HKLM\SYSTEM\CurrentControlSet\Services\Scream\Parameters
-///   - UnicastTargets  REG_SZ  "IP:PORT IP:PORT ..."
-///   - UnicastPort     REG_DWORD  (사용 안 할 경우)
+/// Scream 4.0 실제 레지스트리 키 (소스: adapter.cpp):
+///   HKLM\SYSTEM\CurrentControlSet\Services\Scream\Options
+///   - UnicastIPv4     REG_SZ    대상 IP (기본: "239.255.77.77", 멀티캐스트 가능)
+///   - UnicastPort     REG_DWORD 대상 포트 (기본: 4010)
+///   - UnicastSrcIPv4  REG_SZ    송신 소스 IP (선택)
+///   - UnicastSrcPort  REG_DWORD 송신 소스 포트 (기본: 0 = OS 자동)
+///   - TTL             REG_DWORD 멀티캐스트 TTL
+///   - DSCP            REG_DWORD DSCP 마킹 값
 ///   - SilenceThreshold REG_DWORD
 ///
-/// Scream 네트워크 드라이버(WDM)는 재시작하면 설정이 반영됨.
+/// 채널/샘플레이트/비트뎁스는 WASAPI 레벨에서 설정됨 (레지스트리 불필요).
+/// 드라이버 재시작(디바이스 비활성화→활성화) 시 설정이 반영됨.
 /// </summary>
 [SupportedOSPlatform("windows")]
 public class ScreamManager
 {
     private const string ScreamRegPath =
-        @"SYSTEM\CurrentControlSet\Services\Scream\Parameters";
+        @"SYSTEM\CurrentControlSet\Services\Scream\Options";
 
     private readonly Aes67Config _cfg;
 
@@ -45,8 +50,8 @@ public class ScreamManager
     // ── 설정 적용 ────────────────────────────────────────────
 
     /// <summary>
-    /// Scream 드라이버에 멀티캐스트 주소/포트/채널 설정 기록.
-    /// 관리자 권한 필요.
+    /// Scream 4.0 드라이버에 네트워크 설정 기록.
+    /// 관리자 권한 필요. 드라이버 재시작 후 반영.
     /// </summary>
     public void ApplyConfig()
     {
@@ -54,14 +59,15 @@ public class ScreamManager
         if (key == null)
             throw new InvalidOperationException("Scream 레지스트리 키를 열 수 없습니다. 관리자 권한이 필요합니다.");
 
-        // Scream은 UDP 멀티캐스트로 "IP:PORT" 문자열을 사용
-        string target = $"{_cfg.MulticastAddress}:{_cfg.RtpPort}";
-        key.SetValue("UnicastTargets", target, RegistryValueKind.String);
+        // UnicastIPv4: 멀티캐스트 주소 (예: 239.255.77.77)
+        key.SetValue("UnicastIPv4", _cfg.MulticastAddress, RegistryValueKind.String);
+        // UnicastPort: RTP 포트 (AES67 기본 5004, Scream 기본 4010)
+        key.SetValue("UnicastPort",  _cfg.RtpPort,  RegistryValueKind.DWord);
+        // TTL: 멀티캐스트 TTL (로컬 서브넷 = 1, 라우팅 필요 시 증가)
+        key.SetValue("TTL",          32,             RegistryValueKind.DWord);
 
-        // 채널 수 및 샘플 포맷 (Scream 1.4+ 지원)
-        key.SetValue("Channels",       (int)_cfg.Channels,  RegistryValueKind.DWord);
-        key.SetValue("SampleRate",     _cfg.SampleRate,      RegistryValueKind.DWord);
-        key.SetValue("SampleSize",     _cfg.BitDepth,        RegistryValueKind.DWord);
+        if (!string.IsNullOrEmpty(_cfg.LocalInterface))
+            key.SetValue("UnicastSrcIPv4", _cfg.LocalInterface, RegistryValueKind.String);
     }
 
     /// <summary>현재 레지스트리에서 Scream 설정 읽기</summary>
@@ -72,10 +78,10 @@ public class ScreamManager
 
         return new ScreamRegistrySettings
         {
-            UnicastTargets = key.GetValue("UnicastTargets") as string ?? "",
-            Channels       = (int)(key.GetValue("Channels")    ?? 2),
-            SampleRate     = (int)(key.GetValue("SampleRate")  ?? 48000),
-            SampleSize     = (int)(key.GetValue("SampleSize")  ?? 16),
+            UnicastTargets = key.GetValue("UnicastIPv4") as string ?? "239.255.77.77",
+            Channels       = 2,    // WASAPI 레벨 설정 — 레지스트리 없음
+            SampleRate     = 48000,
+            SampleSize     = 24,
         };
     }
 

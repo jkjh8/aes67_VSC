@@ -1,0 +1,11 @@
+# Build outputs
+**/bin/
+**/obj/
+build/output/
+
+# zip (소스 관리 불필요)
+tools/scream/Scream4.0.zip
+
+# IDE
+.vs/
+*.user

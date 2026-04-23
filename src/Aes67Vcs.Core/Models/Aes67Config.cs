@@ -24,10 +24,13 @@ public class Aes67Config
     public int BitDepth => 24;
 
     // ── 네트워크 ─────────────────────────────────────────────
-    /// <summary>RTP 멀티캐스트 주소 (예: 239.69.83.133)</summary>
-    public string MulticastAddress { get; set; } = "239.69.83.133";
-    /// <summary>RTP 포트 (AES67 기본 5004)</summary>
-    public int RtpPort { get; set; } = 5004;
+    /// <summary>
+    /// RTP 멀티캐스트 주소.
+    /// Scream 기본: 239.255.77.77 / AES67 권장: 239.69.x.x
+    /// </summary>
+    public string MulticastAddress { get; set; } = "239.255.77.77";
+    /// <summary>RTP 포트 (Scream 기본 4010 / AES67 기본 5004)</summary>
+    public int RtpPort { get; set; } = 4010;
     /// <summary>송신에 사용할 로컬 네트워크 인터페이스 IP</summary>
     public string LocalInterface { get; set; } = "";
     /// <summary>스트림 이름 (SAP 어나운스용)</summary>

@@ -1,0 +1,3 @@
+@echo off
+echo AES67 VCS 설치 시작 중...
+powershell -ExecutionPolicy Bypass -Command "Start-Process powershell -ArgumentList '-ExecutionPolicy Bypass -NoExit -File ""%~dp0scripts\install.ps1"" -ScreamInfPath ""%~dp0tools\scream\Install\driver\x64\Scream.inf""' -Verb RunAs"
