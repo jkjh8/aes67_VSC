@@ -1,0 +1,20 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <OutputType>WinExe</OutputType>
+    <TargetFramework>net8.0-windows</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <UseWindowsForms>true</UseWindowsForms>
+    <Platforms>x64</Platforms>
+    <ApplicationIcon>Resources\aes67vcs.ico</ApplicationIcon>
+    <RootNamespace>Aes67Vcs.UI</RootNamespace>
+    <AssemblyName>Aes67Vcs</AssemblyName>
+    <ApplicationManifest>app.manifest</ApplicationManifest>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\Aes67Vcs.Core\Aes67Vcs.Core.csproj" />
+  </ItemGroup>
+
+</Project>
