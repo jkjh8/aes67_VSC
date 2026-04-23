@@ -7,8 +7,7 @@
     <ImplicitUsings>enable</ImplicitUsings>
     <UseWindowsForms>true</UseWindowsForms>
     <Platforms>x64</Platforms>
-    <ApplicationIcon>Resources\aes67vcs.ico</ApplicationIcon>
-    <RootNamespace>Aes67Vcs.UI</RootNamespace>
+<RootNamespace>Aes67Vcs.UI</RootNamespace>
     <AssemblyName>Aes67Vcs</AssemblyName>
     <ApplicationManifest>app.manifest</ApplicationManifest>
   </PropertyGroup>

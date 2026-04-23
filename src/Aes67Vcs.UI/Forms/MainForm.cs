@@ -21,7 +21,6 @@ public class MainForm : Form
     private GroupBox   _grpStream  = null!;
     private GroupBox   _grpPtp     = null!;
     private GroupBox   _grpScream  = null!;
-    private GroupBox   _grpStatus  = null!;
 
     // 스트림 설정
     private ComboBox   _cmbChannels    = null!;
