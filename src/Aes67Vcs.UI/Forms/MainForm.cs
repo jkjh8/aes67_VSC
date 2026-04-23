@@ -40,11 +40,12 @@ public class MainForm : Form
     private ComboBox _cmbNic        = null!;
 
     // PTP
-    private CheckBox _chkPtp       = null!;
-    private TextBox  _txtPtpDomain = null!;
-    private Label    _lblPtpState  = null!;
-    private Label    _lblPtpOffset = null!;
-    private Label    _lblPtpMaster = null!;
+    private CheckBox _chkPtp         = null!;
+    private TextBox  _txtPtpDomain   = null!;
+    private TextBox  _txtPtpMasterIp = null!;
+    private Label    _lblPtpState    = null!;
+    private Label    _lblPtpOffset   = null!;
+    private Label    _lblPtpMaster   = null!;
 
     // Scream
     private Label  _lblScreamStatus = null!;
@@ -80,7 +81,7 @@ public class MainForm : Form
     private void InitializeComponent()
     {
         Text            = "AES67 VCS";
-        Size            = new Size(610, 760);
+        Size            = new Size(610, 790);
         FormBorderStyle = FormBorderStyle.FixedSingle;
         MaximizeBox     = false;
         StartPosition   = FormStartPosition.CenterScreen;
@@ -148,20 +149,30 @@ public class MainForm : Form
         _grpPtp = new GroupBox
         {
             Text = "PTP 동기화 (IEEE 1588v2 / W32TM)",
-            Location = new Point(10, 180), Size = new Size(580, 140)
+            Location = new Point(10, 180), Size = new Size(580, 168)
         };
         int y = 22;
 
         _chkPtp = new CheckBox
         {
-            Text = "W32TM PTP 모니터링", Location = new Point(10, y), Size = new Size(190, 24)
+            Text = "W32TM PTP 동기화", Location = new Point(10, y), Size = new Size(160, 24)
         };
         _grpPtp.Controls.Add(_chkPtp);
 
-        AddLabel(_grpPtp, "도메인:", 210, y);
-        _txtPtpDomain = new TextBox { Location = new Point(265, y), Size = new Size(45, 24) };
+        AddLabel(_grpPtp, "도메인:", 180, y);
+        _txtPtpDomain = new TextBox { Location = new Point(230, y), Size = new Size(40, 24) };
         _grpPtp.Controls.Add(_txtPtpDomain);
-        y += 34;
+        y += 30;
+
+        AddLabel(_grpPtp, "마스터 IP:", 10, y);
+        _txtPtpMasterIp = new TextBox
+        {
+            Location = new Point(80, y), Size = new Size(130, 24),
+            PlaceholderText = "예: 192.168.1.100"
+        };
+        _grpPtp.Controls.Add(_txtPtpMasterIp);
+        AddLabel(_grpPtp, "(비우면 W32TM 설정 유지)", 220, y, 320);
+        y += 30;
 
         _lblPtpState = new Label
         {
@@ -194,7 +205,7 @@ public class MainForm : Form
         _grpScream = new GroupBox
         {
             Text = "Scream 드라이버",
-            Location = new Point(10, 330), Size = new Size(580, 80)
+            Location = new Point(10, 358), Size = new Size(580, 80)
         };
         _lblScreamStatus = new Label
         {
@@ -224,7 +235,7 @@ public class MainForm : Form
         _grpRtp = new GroupBox
         {
             Text = "AES67 RTP 엔진 (C++)",
-            Location = new Point(10, 420), Size = new Size(580, 90)
+            Location = new Point(10, 448), Size = new Size(580, 90)
         };
 
         _lblRtpDevice = new Label
@@ -253,7 +264,7 @@ public class MainForm : Form
 
     private void BuildButtonBar()
     {
-        var panel = new Panel { Location = new Point(10, 520), Size = new Size(580, 44) };
+        var panel = new Panel { Location = new Point(10, 548), Size = new Size(580, 44) };
 
         _btnStart = new Button
         {
@@ -280,11 +291,11 @@ public class MainForm : Form
     {
         Controls.Add(new Label
         {
-            Text = "이벤트 로그:", Location = new Point(10, 572), Size = new Size(100, 20)
+            Text = "이벤트 로그:", Location = new Point(10, 600), Size = new Size(100, 20)
         });
         _lstLog = new ListBox
         {
-            Location = new Point(10, 592), Size = new Size(580, 120),
+            Location = new Point(10, 620), Size = new Size(580, 120),
             HorizontalScrollbar = true
         };
         Controls.Add(_lstLog);
@@ -300,6 +311,7 @@ public class MainForm : Form
         _txtStreamName.Text        = _cfg.StreamName;
         _chkPtp.Checked            = _cfg.PtpEnabled;
         _txtPtpDomain.Text         = _cfg.PtpDomain.ToString();
+        _txtPtpMasterIp.Text       = _cfg.PtpMasterIp;
     }
 
     private void SaveUiToConfig()
@@ -311,6 +323,7 @@ public class MainForm : Form
 
         if (int.TryParse(_txtPort.Text, out int port))        _cfg.RtpPort   = port;
         if (int.TryParse(_txtPtpDomain.Text, out int domain)) _cfg.PtpDomain = domain;
+        _cfg.PtpMasterIp = _txtPtpMasterIp.Text.Trim();
 
         if (_cmbNic.SelectedItem is NicItem n)
             _cfg.LocalInterface = n.IpAddress;
@@ -367,8 +380,12 @@ public class MainForm : Form
         {
             _ptp = new PtpMonitor();
             _ptp.StatusChanged += OnPtpStatus;
-            _ptp.Start();
-            Log("PTP 모니터 시작 (W32TM)");
+            _ptp.LogMessage    += Log;
+            _ptp.Start(_cfg.PtpMasterIp);   // 마스터 IP 있으면 w32tm 자동 설정
+            string ptpMsg = string.IsNullOrWhiteSpace(_cfg.PtpMasterIp)
+                ? "PTP 모니터 시작 (W32TM 설정 유지)"
+                : $"PTP 모니터 시작 → 마스터 {_cfg.PtpMasterIp}";
+            Log(ptpMsg);
         }
 
         // 5. SAP

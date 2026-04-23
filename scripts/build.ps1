@@ -16,7 +16,6 @@ param(
 
 $ErrorActionPreference = "Stop"
 $Root          = Resolve-Path "$PSScriptRoot\.."
-$SolutionPath  = "$Root\Aes67Vcs.sln"
 $CppVcxproj    = "$Root\src\Aes67Engine\Aes67Engine.vcxproj"
 $NativeBinDir  = "$Root\build\native"
 $DllName       = "Aes67Engine.dll"
@@ -83,15 +82,18 @@ try {
     Write-Fail ".NET SDK를 찾을 수 없습니다. https://dotnet.microsoft.com 에서 설치하세요."
 }
 
-# ── 3. 패키지 복원 ────────────────────────────────────────────
+# ── 3. 패키지 복원 (C# 프로젝트만) ────────────────────────────
 Write-Step "패키지 복원"
-dotnet restore $SolutionPath --verbosity quiet
+$CoreProj = "$Root\src\Aes67Vcs.Core\Aes67Vcs.Core.csproj"
+$UiProj   = "$Root\src\Aes67Vcs.UI\Aes67Vcs.UI.csproj"
+dotnet restore $CoreProj --verbosity quiet
+dotnet restore $UiProj   --verbosity quiet
 if ($LASTEXITCODE -ne 0) { Write-Fail "복원 실패" }
 Write-OK "복원 완료"
 
-# ── 4. C# 빌드 ────────────────────────────────────────────────
+# ── 4. C# 빌드 (C# 프로젝트만 — dotnet은 vcxproj 불가) ────────
 Write-Step "C# 빌드 ($Configuration)"
-dotnet build $SolutionPath -c $Configuration --no-restore --verbosity minimal
+dotnet build $UiProj -c $Configuration --no-restore --verbosity minimal
 if ($LASTEXITCODE -ne 0) { Write-Fail "빌드 실패" }
 Write-OK "빌드 성공"
 

@@ -42,6 +42,11 @@ public class Aes67Config
     public int PtpDomain { get; set; } = 0;
     /// <summary>PTP 멀티캐스트 주소 (기본 224.0.1.129)</summary>
     public string PtpMulticastAddress { get; set; } = "224.0.1.129";
+    /// <summary>
+    /// W32TM이 동기화할 PTP 그랜드마스터 IP.
+    /// 비어 있으면 W32TM 자동 설정을 건너뜀.
+    /// </summary>
+    public string PtpMasterIp { get; set; } = "";
 
     // ── Scream ───────────────────────────────────────────────
     public bool ScreamEnabled { get; set; } = true;

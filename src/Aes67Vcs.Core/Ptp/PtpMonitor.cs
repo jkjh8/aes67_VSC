@@ -30,11 +30,22 @@ public sealed class PtpMonitor : IDisposable
     /// <summary>상태가 바뀔 때마다 발생 (UI 스레드가 아닐 수 있음)</summary>
     public event Action<PtpStatus>? StatusChanged;
 
+    /// <summary>W32TM 설정 오류 / 정보 메시지</summary>
+    public event Action<string>? LogMessage;
+
     // ── 시작/중지 ────────────────────────────────────────────
 
-    public void Start()
+    /// <summary>
+    /// PTP 모니터 시작.
+    /// masterIp 가 비어있지 않으면 W32TM 을 해당 마스터로 자동 설정한다.
+    /// </summary>
+    public void Start(string masterIp = "")
     {
         if (_cts != null) return;
+
+        if (!string.IsNullOrWhiteSpace(masterIp))
+            ConfigureW32Tm(masterIp);
+
         _cts  = new CancellationTokenSource();
         _task = Task.Run(() => PollLoop(_cts.Token));
     }
@@ -46,6 +57,43 @@ public sealed class PtpMonitor : IDisposable
         _cts  = null;
         _task = null;
         UpdateStatus(new PtpStatus { State = PtpState.Disabled });
+    }
+
+    // ── W32TM 자동 설정 ──────────────────────────────────────
+
+    /// <summary>
+    /// w32tm /config + /resync 를 실행해 지정한 IP를 PTP 마스터로 설정.
+    /// 관리자 권한 필요 (app.manifest requestedExecutionLevel=requireAdministrator).
+    /// </summary>
+    private void ConfigureW32Tm(string masterIp)
+    {
+        try
+        {
+            // 1. 피어 설정
+            RunW32Tm($"/config /manualpeerlist:\"{masterIp}\" /syncfromflags:manual /reliable:yes /update");
+            LogMessage?.Invoke($"W32TM 피어 설정: {masterIp}");
+
+            // 2. 즉시 재동기화
+            RunW32Tm("/resync /force");
+            LogMessage?.Invoke("W32TM 재동기화 요청");
+        }
+        catch (Exception ex)
+        {
+            LogMessage?.Invoke($"[경고] W32TM 설정 실패: {ex.Message}");
+        }
+    }
+
+    private static void RunW32Tm(string args)
+    {
+        var psi = new ProcessStartInfo("w32tm", args)
+        {
+            UseShellExecute        = false,
+            RedirectStandardOutput = true,
+            RedirectStandardError  = true,
+            CreateNoWindow         = true,
+        };
+        using var proc = Process.Start(psi) ?? throw new InvalidOperationException("w32tm 시작 실패");
+        proc.WaitForExit(5000);
     }
 
     public PtpStatus GetStatus()
